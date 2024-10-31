@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <title>Support Tickets</title>
+</head>
+<body>
+    <h1>Support Tickets</h1>
+    <ul>
+        {% for ticket in tickets %}
+            <li>
+                <a href="{{ url_for('admin.ticket_detail', ticket_id=ticket.id) }}">
+                    Ticket #{{ ticket.id }} - {{ ticket.subject }} ({{ ticket.status }})
+                </a>
+            </li>
+        {% endfor %}
+    </ul>
+    <a href="{{ url_for('admin.logout') }}">Logout</a>
+</body>
+</html>

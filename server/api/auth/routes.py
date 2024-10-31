@@ -110,7 +110,7 @@ def signup():
     user_id = 0
     
     encrypted_password = encrypt_password(dict_data['password'], DES_KEY)
-    
+
     result = dbc.execute_query('create_user_admin', args={
         "username": dict_data['username'],
         "password": encrypted_password,

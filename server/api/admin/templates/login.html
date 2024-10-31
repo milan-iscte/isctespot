@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <title>Login</title>
+</head>
+<body>
+    <h1>Support Team Login</h1>
+    <form method="POST" action="{{ url_for('admin.login') }}" enctype="application/json">
+        <label>Username: <input type="text" name="username" required></label><br>
+        <label>Password: <input type="password" name="password" required></label><br>
+        <button type="submit">Login</button>
+    </form>
+</body>
+</html>

@@ -23,6 +23,7 @@ export const useMainStore = defineStore('main', () => {
   const totalRevenue = ref([])
   const cashFlow = ref([])
   const last3Sales = ref([])
+  const tickets = ref([])
   // const userName = ref()
 
   function setUser(payload) {
@@ -101,6 +102,22 @@ export const useMainStore = defineStore('main', () => {
       .post(url, clientsPayload)
       .then((r) => {
         this._clients = r.data.clients
+      })
+      .catch((error) => {
+        alert(error.message);
+    });
+  }
+
+  function getTickets() {
+    const url = "http://localhost:5000/support/tickets"
+    const ticketsPayload = {
+      user_id: Number(localStorage.getItem('userId')),
+      token: localStorage.getItem('token')
+    };
+    axios
+      .post(url, ticketsPayload)
+      .then((r) => {
+        this.tickets = r.data.tickets
       })
       .catch((error) => {
         alert(error.message);
@@ -218,6 +235,7 @@ export const useMainStore = defineStore('main', () => {
     _clients,
     _employees,
     products,
+    tickets,
     totalRevenue,
     cashFlow,
     setUser,
@@ -229,6 +247,7 @@ export const useMainStore = defineStore('main', () => {
     getCompanyEmployees,
     getCompanyProducts,
     getCompanyCashFlow,
+    getTickets,
     deleteEmployee,
     editCommission,
     calculateSalesRevenue
