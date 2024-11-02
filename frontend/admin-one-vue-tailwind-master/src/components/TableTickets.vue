@@ -3,11 +3,10 @@ import { computed, ref } from 'vue'
 import { useMainStore } from '@/stores/main'
 import { mdiEye, mdiTrashCan } from '@mdi/js'
 import CardBoxModal from '@/components/CardBoxModal.vue'
-import TableCheckboxCell from '@/components/TableCheckboxCell.vue'
 import BaseLevel from '@/components/BaseLevel.vue'
 import BaseButtons from '@/components/BaseButtons.vue'
 import BaseButton from '@/components/BaseButton.vue'
-import UserAvatar from '@/components/UserAvatar.vue'
+import PillTag from './PillTag.vue'
 import axios from 'axios'
 import { useRouter } from 'vue-router'
 
@@ -27,6 +26,7 @@ const ticketUserID = ref()
 const ticketCategory = ref()
 const ticketStatus = ref()
 const ticketMessages = ref()
+const textBoxPlaceholder = ref('Type your comment here...')
 const currentPage = ref(0)
 const remove = (arr, cb) => {
   const newArr = []
@@ -36,16 +36,7 @@ const remove = (arr, cb) => {
       newArr.push(item)
     }
   })
-
   return newArr
-}
-
-const checked = (isChecked, client) => {
-  if (isChecked) {
-    checkedRows.value.push(client)
-  } else {
-    checkedRows.value = remove(checkedRows.value, (row) => row.id === client.id)
-  }
 }
 
 const submitComment = async (ticketId, message) => {
@@ -53,43 +44,43 @@ const submitComment = async (ticketId, message) => {
     message: message,
     user_id: localStorage.getItem('userId'),
     token: localStorage.getItem('token')
-  } 
+  }
   try {
     await axios.post(`http://localhost:5000/support/ticket/${ticketId}/new-message`, submitCommentPayload)
     isModalDangerActive.value = false
-    router.push('/support')
-  } catch (error) {
-    alert(`Error: ${error.message}`)
-  }
-}
-// Function to handle the delete action
-const deleteClient = async (client) => {
-
-  const deleteClientPayload = {
-    client_id: client['ClientID'],
-    token: localStorage.getItem('token'),
-    user_id: localStorage.getItem('userId'),
-
-  }
-  try {
-    await axios.post(`http://localhost:5000/support/tickets`, deleteClientPayload)
-    // Assuming you refetch the client list after deletion
-    mainStore.fetchTickets()
-    isModalDangerActive.value = false
-    router.push('/support')
+    ticketMessages.value.push({
+      Username: localStorage.getItem('username'),
+      MessageText: message
+    })
+    textBoxPlaceholder.value = ''
   } catch (error) {
     alert(`Error: ${error.message}`)
   }
 }
 
+function statusColer(status) {
+  switch (status) {
+    case 'resolved':
+      return 'success';
+    case 'Waiting for support':
+      return 'warning';
+    case 'Waiting for customer':
+      return 'danger';
+    case 'in progress':
+      return 'info';
+    default:
+      return 'contrast';
+  }
+}
 </script>
 
 <template>
-  <CardBoxModal v-model="isModalActive" :title="ticketDescription">
+  <CardBoxModal v-model="isModalActive" :title="ticketDescription" updateOnDone="/support">
     <section class="modal-body">
       <div class="ticket-details">
         <p><strong>Requester (User ID):</strong> {{ ticketUserID }}</p>
         <p><strong>Category:</strong> {{ ticketCategory }}</p>
+        <p><strong>Description:</strong> {{ ticketDescription }}</p>
         <p><strong>Status:</strong> {{ ticketStatus }}</p>
         <p><strong>Messages:</strong></p>
         <div class="messages-list" v-if="ticketMessages && ticketMessages.length">
@@ -104,7 +95,7 @@ const deleteClient = async (client) => {
     </section>
     <footer class="modal-footer">
       <form @submit.prevent="submitComment(selectedTicketId, newComment)">
-        <textarea v-model="newComment" rows="3" placeholder="Type your comment here..." required></textarea>
+        <textarea v-model="newComment" rows="3" :placeholder="textBoxPlaceholder" required></textarea>
         <BaseButton label="Submit" color="info" type="submit" />
       </form>
     </footer>
@@ -136,14 +127,22 @@ const deleteClient = async (client) => {
         <td data-label="Category">
           {{ ticket['Category'] }}
         </td>
-        <td data-label="Category">
-          {{ ticket['Status'] }}
+        <td data-label="Status">
+          <PillTag
+            :color="statusColer(ticket['Status'])"
+            :label="ticket['Status']"
+            :small="true"
+            :outline="false"
+          />
+          <!-- <span :class="statusBadgeClass(ticket['Status'])">
+            {{ ticket['Status'] }}
+          </span> -->
         </td>
         <td class="before:hidden lg:w-1 whitespace-nowrap">
           <BaseButtons type="justify-start lg:justify-end" no-wrap>
             <BaseButton color="info" :icon="mdiEye" small @click="() => {
                 selectedTicketId = ticket['TicketID'];
-                ticketUserID = ticket['UserID']
+                ticketUserID = ticket['UserID'];
                 ticketDescription = ticket['Description'];
                 ticketCategory = ticket['Category'];
                 ticketStatus = ticket['Status'];
@@ -175,6 +174,33 @@ const deleteClient = async (client) => {
 </template>
 
 <style scoped>
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  color: white;
+  font-weight: 600;
+  font-size: 0.85em;
+  display: inline-block;
+  text-align: center;
+}
+
+.status-badge.resolved {
+  background-color: #4caf50; /* green */
+}
+
+.status-badge.waiting-support {
+  background-color: #ffc107; /* yellow */
+  color: black;
+}
+
+.status-badge.waiting-customer {
+  background-color: #f44336; /* red */
+}
+
+.status-badge.in-progress {
+  background-color: #2196f3; /* blue */
+}
+
 .modal-body {
   padding: 20px;
   background-color: #f9f9f9;

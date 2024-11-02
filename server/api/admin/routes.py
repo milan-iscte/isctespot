@@ -103,6 +103,8 @@ def new_agent_message(ticket_id):
 def new_ticket():
     dbc = DBConnector()
     dict_data = request.get_json()
+    print('\n')
+    print(dict_data)
     if dict_data['category'] not in ['Technical Issue', 'Billing', 'Question', 'Feature Request']:
         return jsonify({'status': "Bad request"}), 400
     if dict_data['token'] != current_app.config['ADMIN_AUTH_TOKEN'] and dict_data['token'] != current_app.config['AUTH_TOKEN']:

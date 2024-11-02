@@ -21,7 +21,7 @@ const router = useRouter()
 
 const selectOptions = [
   { id: 1, label: 'Feature Request' },
-  { id: 2, label: 'Issue/Bug' },
+  { id: 2, label: 'Technical Issue' },
   { id: 3, label: 'Billing' },
   { id: 4, label: 'Question' }
 ]
@@ -41,9 +41,8 @@ const customElementsForm = reactive({
 
 const submit = () => {
   const newTicketPayload = {
-    title: form.title,
-    category: form.category,
-    status: "waiting for support",
+    category: form.category['label'],
+    status: "Waiting for support",
     description: form.description,
     user_id: localStorage.getItem('userId'),
     token: localStorage.getItem('token'),
@@ -93,96 +92,17 @@ const formStatusSubmit = () => {
         />
       </SectionTitleLineWithButton>
       <CardBox :class="cardClass" is-form @submit.prevent="submit">
-        <FormField label="Title" help="Short title for you request">
-          <FormControl
-            v-model="form.title"
-            :icon="mdiIdCard"
-            name="title"
-            size="small"
-          />
-        </FormField>
         <FormField label="Category">
           <FormControl v-model="form.category" :options="selectOptions" />
         </FormField>
         <FormField label="Description">
           <FormControl type="textarea" placeholder="Describe your issue here" v-model="form.description"/>
         </FormField>
-
         <template #footer>
           <BaseButtons>
             <BaseButton type="submit" color="info" label="Submit" />
             <BaseButton type="reset" color="danger" outline label="Cancel" to="/company/employees" />
           </BaseButtons>
-        </template>
-      </CardBox>
-    </SectionMain>
-
-    <SectionTitle>Custom elements</SectionTitle>
-
-    <SectionMain>
-      <CardBox>
-        <FormField label="Checkbox">
-          <FormCheckRadioGroup
-            v-model="customElementsForm.checkbox"
-            name="sample-checkbox"
-            :options="{ lorem: 'Lorem', ipsum: 'Ipsum', dolore: 'Dolore' }"
-          />
-        </FormField>
-
-        <BaseDivider />
-
-        <FormField label="Radio">
-          <FormCheckRadioGroup
-            v-model="customElementsForm.radio"
-            name="sample-radio"
-            type="radio"
-            :options="{ one: 'One', two: 'Two' }"
-          />
-        </FormField>
-
-        <BaseDivider />
-
-        <FormField label="Switch">
-          <FormCheckRadioGroup
-            v-model="customElementsForm.switch"
-            name="sample-switch"
-            type="switch"
-            :options="{ one: 'One', two: 'Two' }"
-          />
-        </FormField>
-
-        <BaseDivider />
-
-        <FormFilePicker v-model="customElementsForm.file" label="Upload" />
-      </CardBox>
-
-      <SectionTitle>Form with status example</SectionTitle>
-
-      <CardBox
-        class="md:w-7/12 lg:w-5/12 xl:w-4/12 shadow-2xl md:mx-auto"
-        is-form
-        is-hoverable
-        @submit.prevent="formStatusSubmit"
-      >
-        <NotificationBarInCard
-          :color="formStatusOptions[formStatusCurrent]"
-          :is-placed-with-header="formStatusWithHeader"
-        >
-          <span
-            ><b class="capitalize">{{ formStatusOptions[formStatusCurrent] }}</b> state</span
-          >
-        </NotificationBarInCard>
-        <FormField label="Fields">
-          <FormControl
-            v-model="form.name"
-            :icon-left="mdiAccount"
-            help="Your full name"
-            placeholder="Name"
-          />
-        </FormField>
-
-        <template #footer>
-          <BaseButton label="Trigger" type="submit" color="info" />
         </template>
       </CardBox>
     </SectionMain>

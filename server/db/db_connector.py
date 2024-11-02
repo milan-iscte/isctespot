@@ -51,6 +51,7 @@ class DBConnector:
                     'create_company'            args: {company_name, n_employees}
                     'create_client'             args: {first_name, last_name, email, phone_number, address, city, country, company_id}
                     'create_sale'               args: {client_id, user_id, product, price, quantity}
+                    'create_ticket'             args: {user_id, status, description, category, messages}
                 UPDATE
                     'update_user_password'      args: {user_id, new_password}
                     'update_user_comp_id'       args: {user_id, comp_id}
@@ -512,7 +513,7 @@ class DBConnector:
             elif query == 'create_ticket':
                 cursor.execute(
                     "INSERT INTO SupportTickets (UserID, Status, Category, Description, Messages, CreatedAt) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
-                    (args['user_id'], args['status'], args['category'], args['status'], args['messages'])
+                    (args['user_id'], args['status'], args['category'], args['description'], args['messages'])
                 )
                 connection.commit()
                 result = cursor.lastrowid
