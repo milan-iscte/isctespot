@@ -58,7 +58,7 @@
             {% for ticket in tickets %}
                 <li>
                     <a href="{{ url_for('admin.ticket_detail', ticket_id=ticket.TicketID) }}">
-                        Ticket #{{ ticket.UserID }} - {{ ticket.Category }} ({{ ticket.Status }})
+                        Ticket #{{ ticket.TicketID }} - {{ ticket.Category }} ({{ ticket.Status }})
                     </a>
                 </li>
             {% endfor %}
