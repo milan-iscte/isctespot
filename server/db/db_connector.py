@@ -40,6 +40,8 @@ class DBConnector:
                     'get_last_3_sales'          args:user_id        |       return: list of last_3_sales
                     'get_sales_month_comp_id'   args:month,comp_id  |       return: list of sales of selected month
                     'get_costs_sales_month'     args:month,comp_id  |       return: production costs and sales revenue for given month
+                    'get_admin_tickets'         args:comp_id        |       return: list of company support tickets
+                    'get_user_tickets'         args:user_id         |       return: list of user support tickets
                 CREATE
                     'create_user_employee'      args: {username, email, company_id}
                     'create_user_admin'         args: {username, password, email}
@@ -51,6 +53,7 @@ class DBConnector:
                     'update_user_comp_id'       args: {user_id, comp_id}
                     'update_products_by_comp_id args: {file, comp_id}
                     'update_company_revenue'    args: comp_id
+                    'update_ticket_messages'    args: {ticket_id, message}
                 DELETE
                     'delete_users_by_comp_id'   args: {user_id, company_id}
                     'delete_user_by_id'         args: user_id
@@ -212,7 +215,7 @@ class DBConnector:
                 if isinstance(result, tuple):
                     return result[0]
                 return result['Revenue']
-            
+
             elif query == 'get_employees_return':
                 cursor.execute(
                     f"""
@@ -248,7 +251,7 @@ class DBConnector:
                     })
 
                 return employee_sales_data
-            
+
             elif query == 'get_last_3_sales':
                 cursor.execute(
                     f"""
@@ -281,7 +284,7 @@ class DBConnector:
                     return result
                 else:
                     return False
-            
+
             elif query == 'get_sales_month_comp_id':
                 cursor.execute(
                     """
@@ -334,6 +337,85 @@ class DBConnector:
                         return result
                 except TypeError:
                     return False
+
+            elif query == 'get_admin_tickets':
+                cursor.execute(
+                    f"""
+                    SELECT 
+                        st.TicketID,
+                        st.UserID,
+                        u.CompanyID,
+                        st.Status,
+                        st.Category,
+                        st.Description,
+                        st.Messages,
+                        st.CreatedAt,
+                        st.UpdatedAt
+                    FROM 
+                        SupportTickets st
+                    JOIN 
+                        Users u ON st.UserID = u.UserID
+                    WHERE 
+                        u.CompanyID = {args};
+                    """
+                )
+                result = cursor.fetchall()
+                if isinstance(result, list):
+                    return result
+                else:
+                    return False
+
+            elif query == 'get_user_tickets':
+                cursor.execute(
+                    f"""
+                    SELECT 
+                        TicketID,
+                        UserID,
+                        Status,
+                        Category,
+                        Description,
+                        Messages,
+                        CreatedAt,
+                        UpdatedAt
+                    FROM 
+                        SupportTickets st
+                    WHERE 
+                        UserID = {args};
+                    """
+                )
+                result = cursor.fetchall()
+                if isinstance(result, list):
+                    return result
+                else:
+                    return False
+            
+            elif query == 'get_ticket_by_id':
+                cursor.execute(
+                    f"""
+                    SELECT 
+                        UserID,
+                        Status,
+                        Category,
+                        Description,
+                        Messages,
+                        CreatedAt,
+                        UpdatedAt
+                    FROM 
+                        SupportTickets
+                    WHERE 
+                        TicketID = {args};
+                    """
+                )
+                result = cursor.fetchone()
+                print(result)
+                try:
+                    if isinstance(result, tuple):
+                        return result[0]
+                    else:
+                        return result
+                except TypeError:
+                    return False
+
             elif query == 'create_user_employee':
                 cursor.execute(
                     "INSERT INTO Users (Username, PasswordHash, Email, CompanyID, CommissionPercentage, CreatedAt) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
@@ -390,6 +472,18 @@ class DBConnector:
                 connection.commit()
                 result = cursor.lastrowid
                 print(result)
+                if isinstance(result, tuple):
+                    return result[0]
+                else:
+                    return result
+            
+            elif query == 'create_ticket':
+                cursor.execute(
+                    "INSERT INTO SupportTickets (UserID, Status, Category, Description, Messages, CreatedAt) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+                    (args['user_id'], args['status'], args['category'], args['status'], args['messages'])
+                )
+                connection.commit()
+                result = cursor.lastrowid
                 if isinstance(result, tuple):
                     return result[0]
                 else:
@@ -477,6 +571,30 @@ class DBConnector:
                 connection.commit()
                 affected_rows = cursor.rowcount
                 return affected_rows > 0
+            
+            elif query == 'update_ticket_messages':
+                message = args["message"]
+                username = args['username']
+                ticket_id = args['ticket_id']
+                new_status = 'Waiting for customer' if args['is_agent'] else 'Waiting for support'
+                
+                # Use placeholders (%s) for parameters
+                cursor.execute(
+                    """
+                    UPDATE SupportTickets
+                    SET 
+                        Messages = JSON_ARRAY_APPEND(
+                            IFNULL(Messages, JSON_ARRAY()), '$', JSON_OBJECT('username', %s, 'MessageText', %s)
+                        ),
+                        UpdatedAt = CURRENT_TIMESTAMP,
+                        Status = %s
+                    WHERE TicketID = %s;
+                    """, (username, message, new_status, ticket_id)
+                )
+                
+                connection.commit()
+                affected_rows = cursor.rowcount
+                return affected_rows >= 0
 
             elif query == 'delete_sales_by_comp_id':
                 cursor.execute(
@@ -526,6 +644,7 @@ class DBConnector:
                 print('Deleting Sales')
                 print(result)
                 return True
+            
             elif query == 'delete_products_by_comp_id':
                 cursor.execute(f"DELETE FROM Products WHERE CompanyID = {args}")
                 connection.commit()

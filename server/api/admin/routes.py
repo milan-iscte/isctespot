@@ -1,6 +1,6 @@
 from flask import Blueprint, request, current_app, render_template, redirect, url_for, flash, make_response, jsonify
 from db.db_connector import DBConnector
-
+import json
 admin = Blueprint('admin', __name__, template_folder='templates')
 
 ### temporary Fake DB to speed up development
@@ -57,42 +57,69 @@ def view_tickets():
     tickets = support_tickets
     return render_template('tickets.html', tickets=tickets)
 
-@admin.route('/ap/ticket/<int:ticket_id>', methods=['GET', 'POST'])
+@admin.route('/support/ticket/<int:ticket_id>', methods=['GET', 'POST'])
 def ticket_detail(ticket_id):
-    _ticket = None
-    _ticket_index = None
-    for index, ticket in enumerate(support_tickets):
-        if ticket_id == ticket['id']:
-            _ticket = ticket
-            _ticket_index = index
-
-    if request.method == 'POST':
-        new_status = request.form.get('status')
-        if new_status in ['in progress', 'resolved']:
-            support_tickets[_ticket_index]['status'] = new_status
-            message = f'Ticket status updated to "{new_status}"'
-        else:
-            message = 'Invalid status update'
-        return redirect(url_for('admin.ticket_detail', ticket_id=ticket_id, message=message))
-
-    return render_template('ticket_detail.html', ticket=_ticket)
+    dbc = DBConnector()
+    dict_data = request.get_json()
+    result = dbc.execute_query('get_ticket_by_id', args=ticket_id)
+    if result['UserID'] != dict_data['user_id']:
+        return jsonify({'status': "Unauthorized"}), 403
+    else:
+        return jsonify({'status': 'Ok', 'ticket':result}), 200
+    
 
 @admin.route('/support/new-ticket', methods=['POST'])
 def new_ticket():
     dbc = DBConnector()
     dict_data = request.get_json()
+    if dict_data['category'] not in ['Technical Issue', 'Billing', 'Question', 'Feature Request']:
+        return jsonify({'status': "Bad request"}), 400
     if dict_data['token'] != current_app.config['ADMIN_AUTH_TOKEN'] and dict_data['token'] != current_app.config['AUTH_TOKEN']:
-        new_ticket = {
-            'id': len(support_tickets)+1,
-            'user_id': dict_data['user_id'],
-            'subject': dict_data['subject'],
-            'status': dict_data['status'],
-            'description': dict_data['description'],
-        }
-        ## add to db
-        support_tickets.append(new_ticket)
+        return jsonify({'status': "Unauthorized"}), 403
+    ticket = {
+        'user_id': dict_data['user_id'],
+        'category': dict_data['category'],
+        'status': dict_data['status'],
+        'description': dict_data['description'],
+        'messages': json.dumps([])
+    }
+    result = dbc.execute_query('create_ticket', args=ticket)
+    if isinstance(result, int):
+        return jsonify({'status': 'Ok', 'ticket_id':result}), 200
+    else:
+        return jsonify({'status': 'Bad reuest'}), 400
+
+@admin.route('/support/tickets', methods=['POST'])
+def tickets():
+    dbc = DBConnector()
+    dict_data = request.get_json()
+    results = None
+    if dict_data['token'] == current_app.config['ADMIN_AUTH_TOKEN'] or dict_data['token'] == current_app.config['AUTH_TOKEN']:
+        if dict_data['token'] == current_app.config['AUTH_TOKEN']:
+            results = dbc.execute_query('get_user_tickets', args=dict_data['user_id'])
+        if dict_data['token'] == current_app.config['ADMIN_AUTH_TOKEN']:
+            results = dbc.execute_query('get_admin_tickets', args=dict_data['company_id'])
+        if isinstance(results, list):
+            return jsonify({'status': 'Ok', 'tickets': results}), 200
+        return jsonify({'status': 'Bad request'}), 400
+
+    return jsonify({'status': 'Unauthorized'}), 403
+
+@admin.route("/support/ticket/<int:ticket_id>/new-message", methods=['POST'])
+def new_message(ticket_id):
+    dbc = DBConnector()
+    dict_data = request.get_json()
+    result = dbc.execute_query('get_ticket_by_id', args=ticket_id)
+    if result['UserID'] != dict_data['user_id']:
+        return jsonify({'status': "Unauthorized"}), 403
+    user = dbc.execute_query('get_user_by_id', args=result['UserID'])
+    result = dbc.execute_query('update_ticket_messages', args={
+        "username": user['Username'],
+        "ticket_id": ticket_id,
+        "message": dict_data['message'],
+        'is_agent': False # TODO dinamico (check if is agent by userID)
+    })
+    if result:
         return jsonify({'status': 'Ok'}), 200
-        # if result is True:
-        #     return jsonify({'status': 'Ok'}), 200
-        # else:
-        #     return jsonify({'status': "Bad request"}), 400
+    else:
+        return jsonify({'status': 'Bad request'}), 400
