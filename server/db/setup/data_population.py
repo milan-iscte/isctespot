@@ -32,13 +32,14 @@ def insert_users():
             user["CommissionPercentage"],
             user["LastLogout"],
             user["isActive"],
-            user["IsAdmin"]
+            user["IsAdmin"],
+            user["IsAgent"]
         )
         for user in fake_users
     ]
     cursor.executemany("""
-    INSERT INTO Users (Username, PasswordHash, Email, CreatedAt, LastLogin, CompanyID, ResetPassword, CommissionPercentage, LastLogout, isActive, IsAdmin)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    INSERT INTO Users (Username, PasswordHash, Email, CreatedAt, LastLogin, CompanyID, ResetPassword, CommissionPercentage, LastLogout, isActive, IsAdmin, IsAgent)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, fake_users_tuples)
     db.commit()
 

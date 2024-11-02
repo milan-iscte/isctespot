@@ -1,32 +1,14 @@
 from flask import Blueprint, request, current_app, render_template, redirect, url_for, flash, make_response, jsonify
 from db.db_connector import DBConnector
 import json
+import requests
+
 admin = Blueprint('admin', __name__, template_folder='templates')
 
-### temporary Fake DB to speed up development
-tmp_db = [
-    {'ap_user_1':'ap_password_1'},
-    {'ap_user_2':'ap_password_2'},
-    {'ap_user_3':'ap_password_3'}
-]
+########################################################
+###             Admin Portal endpoints               ###
+########################################################
 
-support_tickets = [
-    {
-        "id": 1,
-        "user_id": 1,
-        "subject": 'Error',
-        "status": "waiting for support",
-        "description": "Hello isctespot support, I am having issue when downloading the invoince. Can you please fix it, it is urgent!"
-    },
-    {
-        "id": 3,
-        "user_id": 1,
-        "subject": 'Feature Request',
-        "status": "waiting for support",
-        "description": "Hello I have a feature request! Can you please allow the company admins to edit the style of"
-    }
-]
-###
 @admin.route('/ap/login', methods=['GET', 'POST'])
 def login():
     print(f'Login functoion!')
@@ -34,39 +16,88 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        print(f'Username: {username}, password: {password}')
-        for user in tmp_db:
-            if user[username] == password:
-                print('User found')
-                response = redirect(url_for('admin.view_tickets'))
-                session_token = current_app.config.get("AP_AUTH_TOKEN", "default_token")
-                response.set_cookie('session_token', session_token)
-                return response
-
-        flash('Invalid username or password', 'danger')
+        login_url = f'http://127.0.0.1:5000/login'
+        login_payload = {'username': username, 'password': password}
+        login_response = requests.post(login_url, json=login_payload)
+        data = login_response.json()
+        user_id = data['user_id']
+        username = data['username']
+        if login_response.status_code != 200:
+            return jsonify({'status': "Unauthorized"}), 403
+        if not data['is_agent']:
+            return jsonify({'status': "Unauthorized"}), 403
+        response = redirect(url_for('admin.view_tickets'))
+        session_token = current_app.config.get("AP_AUTH_TOKEN", "default_token")
+        response.set_cookie('session_token', f'{session_token}-{user_id}')
+        response.set_cookie('username', username)
+        return response
     return render_template('login.html')
 
 @admin.route('/ap/logout')
 def logout():
     response = make_response(redirect(url_for('admin.login')))
-    response.set_cookie('session_token', '', expires=0)
+    response.set_cookie('token', '', expires=0)
     return response
 
 @admin.route('/ap/tickets')
 def view_tickets():
-    tickets = support_tickets
-    return render_template('tickets.html', tickets=tickets)
+    dbc = DBConnector()
+    token = request.cookies.get('session_token').split('-')[0]
+    try:
+        if token != current_app.config['AP_AUTH_TOKEN']:
+            return jsonify({'status': "Unauthorized"}), 403
+        tickets = dbc.execute_query('get_agent_tickets')
+        return render_template('tickets.html', tickets=tickets)
+    except KeyError:
+        return jsonify({'status': "Unauthorized"}), 403
 
-@admin.route('/support/ticket/<int:ticket_id>', methods=['GET', 'POST'])
+@admin.route('/ap/ticket/<int:ticket_id>', methods=['GET', 'POST'])
 def ticket_detail(ticket_id):
     dbc = DBConnector()
-    dict_data = request.get_json()
+    # Get the ticket details
     result = dbc.execute_query('get_ticket_by_id', args=ticket_id)
-    if result['UserID'] != dict_data['user_id']:
-        return jsonify({'status': "Unauthorized"}), 403
-    else:
-        return jsonify({'status': 'Ok', 'ticket':result}), 200
-    
+    user_id = result['UserID']
+    is_agent = dbc.execute_query('get_user_agent', args=user_id)
+    result['Messages'] = json.loads(result['Messages'])
+
+    if result['UserID'] != user_id and not is_agent:
+        error_message = "You are not authorized to view this ticket."
+        return render_template('ticket_detail.html', ticket=None, error_message=error_message), 403
+
+    success_message = None
+    if request.method == 'POST':
+        new_status = request.form['status']
+        updated = dbc.execute_query('update_ticket_status', args={'ticket_id':ticket_id, 'status':new_status})
+        if updated:
+            success_message = "Ticket status updated successfully"
+        else:
+            error_message = "Unkown error. Sorry we will look into it "
+            return render_template('ticket_detail.html', ticket=None, error_message=error_message), 403
+        success_message = "Ticket status updated successfully"
+    return render_template('ticket_detail.html', ticket=result, success_message=success_message)
+
+@admin.route("/ap/ticket/<int:ticket_id>/new-message", methods=['POST'])
+def new_agent_message(ticket_id):
+    dbc = DBConnector()
+    ## Check if request comes from trusted connection
+    cookies = request.cookies
+    message = request.form['message']
+    result = dbc.execute_query('update_ticket_messages', args={
+        "username": cookies['username'],
+        "ticket_id": ticket_id,
+        "message": message,
+        'is_agent': True
+    })
+    success_message = None
+    result = dbc.execute_query('get_ticket_by_id', args=ticket_id)
+    if result.get('Messages'):
+        result['Messages'] = json.loads(result['Messages'])
+    return redirect(url_for('admin.ticket_detail', ticket_id=ticket_id))
+
+
+########################################################
+###             User support endpoints               ###
+########################################################
 
 @admin.route('/support/new-ticket', methods=['POST'])
 def new_ticket():
@@ -105,21 +136,38 @@ def tickets():
 
     return jsonify({'status': 'Unauthorized'}), 403
 
+@admin.route('/support/ticket/<int:ticket_id>', methods=['GET', 'POST'])
+def user_ticket_detail(ticket_id):
+    dbc = DBConnector()
+    # Get the ticket details
+    result = dbc.execute_query('get_ticket_by_id', args=ticket_id)
+    user_id = result['UserID']
+    is_agent = dbc.execute_query('get_user_agent', args=user_id)
+    result['Messages'] = json.loads(result['Messages'])
+
+    if result['UserID'] != user_id and not is_agent:
+        return jsonify({'status': 'Unauthorized'}), 403
+    return jsonify({'status': 'Ok', 'ticket': result}), 200
+
 @admin.route("/support/ticket/<int:ticket_id>/new-message", methods=['POST'])
 def new_message(ticket_id):
     dbc = DBConnector()
     dict_data = request.get_json()
     result = dbc.execute_query('get_ticket_by_id', args=ticket_id)
+    is_agent = False
     if result['UserID'] != dict_data['user_id']:
-        return jsonify({'status': "Unauthorized"}), 403
-    user = dbc.execute_query('get_user_by_id', args=result['UserID'])
+        is_agent = dbc.execute_query('get_user_agent', args=dict_data['user_id'])
+        if not is_agent:
+            return jsonify({'status': "Unauthorized"}), 403
+    user = dbc.execute_query('get_user_by_id', args=dict_data['user_id'])
     result = dbc.execute_query('update_ticket_messages', args={
         "username": user['Username'],
         "ticket_id": ticket_id,
         "message": dict_data['message'],
-        'is_agent': False # TODO dinamico (check if is agent by userID)
+        'is_agent': is_agent
     })
     if result:
         return jsonify({'status': 'Ok'}), 200
     else:
         return jsonify({'status': 'Bad request'}), 400
+

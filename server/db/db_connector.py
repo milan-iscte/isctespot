@@ -41,7 +41,10 @@ class DBConnector:
                     'get_sales_month_comp_id'   args:month,comp_id  |       return: list of sales of selected month
                     'get_costs_sales_month'     args:month,comp_id  |       return: production costs and sales revenue for given month
                     'get_admin_tickets'         args:comp_id        |       return: list of company support tickets
-                    'get_user_tickets'         args:user_id         |       return: list of user support tickets
+                    'get_user_tickets'          args:user_id        |       return: list of user support tickets
+                    'get_user_agent'            args:user_id        |       return: return is_agent (True or False)
+                    'get_ticket_by_id'          args:ticket_id      |       return: ticket
+                    'get_agent_tickets'         args:agent token    |       return: agent tokens
                 CREATE
                     'create_user_employee'      args: {username, email, company_id}
                     'create_user_admin'         args: {username, password, email}
@@ -54,6 +57,7 @@ class DBConnector:
                     'update_products_by_comp_id args: {file, comp_id}
                     'update_company_revenue'    args: comp_id
                     'update_ticket_messages'    args: {ticket_id, message}
+                    'update_ticket_status'      args: {ticket_id, status}
                 DELETE
                     'delete_users_by_comp_id'   args: {user_id, company_id}
                     'delete_user_by_id'         args: user_id
@@ -389,21 +393,40 @@ class DBConnector:
                 else:
                     return False
             
-            elif query == 'get_ticket_by_id':
+            elif query == 'get_user_tickets':
                 cursor.execute(
                     f"""
                     SELECT 
-                        UserID,
-                        Status,
-                        Category,
-                        Description,
-                        Messages,
-                        CreatedAt,
-                        UpdatedAt
+                        
                     FROM 
-                        SupportTickets
+                        SupportTickets st
                     WHERE 
-                        TicketID = {args};
+                        UserID = {args};
+                    """
+                )
+                result = cursor.fetchall()
+                if isinstance(result, list):
+                    return result
+                else:
+                    return False
+            
+            elif query == 'get_user_agent':
+                cursor.execute(
+                    f"""
+                    SELECT IsAgent FROM Users WHERE UserID = {args};
+                    """
+                )
+                result = cursor.fetchone()
+                print(result)
+                try:
+                    return result['IsAgent'] == 1
+                except TypeError:
+                    return False
+            
+            elif query == 'get_ticket_by_id':
+                cursor.execute(
+                    f"""
+                    SELECT * FROM SupportTickets WHERE TicketID = {args};
                     """
                 )
                 result = cursor.fetchone()
@@ -416,6 +439,15 @@ class DBConnector:
                 except TypeError:
                     return False
 
+            elif query == 'get_agent_tickets':
+                cursor.execute('SELECT * From SupportTickets')
+                result = cursor.fetchall()
+                print(result)
+                if isinstance(result, list):
+                    return result
+                else:
+                    return False
+                
             elif query == 'create_user_employee':
                 cursor.execute(
                     "INSERT INTO Users (Username, PasswordHash, Email, CompanyID, CommissionPercentage, CreatedAt) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
@@ -584,7 +616,7 @@ class DBConnector:
                     UPDATE SupportTickets
                     SET 
                         Messages = JSON_ARRAY_APPEND(
-                            IFNULL(Messages, JSON_ARRAY()), '$', JSON_OBJECT('username', %s, 'MessageText', %s)
+                            IFNULL(Messages, JSON_ARRAY()), '$', JSON_OBJECT('Username', %s, 'MessageText', %s)
                         ),
                         UpdatedAt = CURRENT_TIMESTAMP,
                         Status = %s
@@ -596,6 +628,19 @@ class DBConnector:
                 affected_rows = cursor.rowcount
                 return affected_rows >= 0
 
+            elif query == 'update_ticket_status':
+                
+                cursor.execute(
+                    """
+                    UPDATE SupportTickets
+                    SET Status = %s, UpdatedAt = CURRENT_TIMESTAMP
+                    WHERE TicketID = %s""",
+                    (args['status'], args['ticket_id'])
+                )
+                connection.commit()
+                affected_rows = cursor.rowcount
+                return affected_rows >= 0
+            
             elif query == 'delete_sales_by_comp_id':
                 cursor.execute(
                     f"""

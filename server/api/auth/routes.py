@@ -58,10 +58,19 @@ def login():
             token = current_app.config['AUTH_TOKEN']
 
         comp_id = dbc.execute_query(query='get_user_comp_id', args=_id)
+        is_agent = dbc.execute_query('get_user_agent', args=_id)
         if not isinstance(comp_id, int):
             return jsonify({'status': 'Bad request'}), 400
 
-        return jsonify({'status': 'Ok', 'user_id': _id, 'token': token, 'is_admin': is_admin, 'comp_id': comp_id}), 200
+        return jsonify({
+            'status': 'Ok',
+            'user_id': _id, 
+            'username': username,
+            'token': token,
+            'is_admin': is_admin,
+            'comp_id': comp_id,
+            'is_agent': is_agent
+        }), 200
 
     return jsonify({'status': 'Bad credentials'}), 403
 

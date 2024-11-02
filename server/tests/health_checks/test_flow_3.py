@@ -76,6 +76,7 @@ if new_ticket_data['status'] == 'Ok':
     test_output_status('pass', 'Create ticket successful')
 else:
     test_output_status('fail', 'Failed to create ticket')
+
 # User opens a ticket
 test_output_status('info', 'Testing Get ticket by id')
 get_ticket_url = f'{base_url}/support/ticket/{ticket_id}'
@@ -103,4 +104,16 @@ if new_message_data['status'] == 'Ok':
 else:
     test_output_status('fail', 'Failed to insert new coment')
 
-# TODO Agent also comments on the ticket
+# Agent also comments on the ticket
+test_output_status('info', 'Testing Agent comment on ticket')
+agent_message_url = f'{base_url}/support/ticket/{ticket_id}/new-message'
+agent_message_payload = {
+    'user_id': 17,
+    'message': 'This is a test message from agent'
+}
+agent_message_response = requests.post(agent_message_url, json=agent_message_payload)
+agent_message_data = agent_message_response.json()
+if agent_message_data['status'] == 'Ok':
+    test_output_status('pass', 'New comment successful')
+else:
+    test_output_status('fail', 'Failed to insert new coment')
