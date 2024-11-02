@@ -153,12 +153,14 @@ def user_ticket_detail(ticket_id):
 def new_message(ticket_id):
     dbc = DBConnector()
     dict_data = request.get_json()
+    print(dict_data)
     result = dbc.execute_query('get_ticket_by_id', args=ticket_id)
     is_agent = False
-    if result['UserID'] != dict_data['user_id']:
+    if int(result['UserID']) != int(dict_data['user_id']):
         is_agent = dbc.execute_query('get_user_agent', args=dict_data['user_id'])
         if not is_agent:
-            return jsonify({'status': "Unauthorized"}), 403
+            if dict_data['token'] != current_app.config['ADMIN_AUTH_TOKEN']:
+                return jsonify({'status': "Unauthorized"}), 403
     user = dbc.execute_query('get_user_by_id', args=dict_data['user_id'])
     result = dbc.execute_query('update_ticket_messages', args={
         "username": user['Username'],

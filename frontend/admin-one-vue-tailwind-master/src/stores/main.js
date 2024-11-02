@@ -112,7 +112,8 @@ export const useMainStore = defineStore('main', () => {
     const url = "http://localhost:5000/support/tickets"
     const ticketsPayload = {
       user_id: Number(localStorage.getItem('userId')),
-      token: localStorage.getItem('token')
+      token: localStorage.getItem('token'),
+      company_id: localStorage.getItem('companyId')
     };
     axios
       .post(url, ticketsPayload)

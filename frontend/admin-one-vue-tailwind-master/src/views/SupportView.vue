@@ -15,7 +15,7 @@ import CardBoxNewClient from '@/components/CardBoxNewClient.vue'
 const mainStore = useMainStore()
 
 onBeforeMount(() => {
-  mainStore.getClients()
+  mainStore.getTickets()
   // console.log('Clients below')
   // console.log(mainStore._clients)
   // mainStore._clients.forEach(client => {
